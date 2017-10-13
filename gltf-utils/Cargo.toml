@@ -7,6 +7,7 @@ repository = "https://github.com/gltf-rs/gltf"
 license = "MIT/Apache-2.0"
 
 [dependencies]
+byteorder = "1.1"
 gltf = { path = "..", version = "0.9.2" }
 
 [features]

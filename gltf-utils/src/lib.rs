@@ -7,11 +7,109 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
+extern crate byteorder;
 extern crate gltf;
 
-use std::{fmt, marker, mem};
+use std::{fmt, io, marker, mem};
 
 use gltf::accessor::{DataType, Dimensions};
+
+/// Marker trait for data types able to be read from an accessor.
+pub trait AccessorData {
+    fn read<B, R>(reader: &mut R) -> io::Result<Self>
+        where B: byteorder::ByteOrder, R: byteorder::ReadBytesExt, Self: Sized;
+}
+
+impl AccessorData for i8 {
+    fn read<B, R>(reader: &mut R) -> io::Result<Self>
+        where B: byteorder::ByteOrder, R: byteorder::ReadBytesExt
+    {
+        reader.read_i8()
+    }
+}
+
+impl AccessorData for u8 {
+    fn read<B, R>(reader: &mut R) -> io::Result<Self>
+        where B: byteorder::ByteOrder, R: byteorder::ReadBytesExt
+    {
+        reader.read_u8()
+    }
+} 
+
+impl AccessorData for i16 {
+    fn read<B, R>(reader: &mut R) -> io::Result<Self>
+        where B: byteorder::ByteOrder, R: byteorder::ReadBytesExt
+    {
+        reader.read_i16::<B>()
+    }
+}
+
+impl AccessorData for u16 {
+    fn read<B, R>(reader: &mut R) -> io::Result<Self>
+        where B: byteorder::ByteOrder, R: byteorder::ReadBytesExt
+    {
+        reader.read_u16::<B>()
+    }
+}
+
+impl AccessorData for f32 {
+    fn read<B, R>(reader: &mut R) -> io::Result<Self>
+        where B: byteorder::ByteOrder, R: byteorder::ReadBytesExt
+    {
+        reader.read_f32::<B>()
+    }
+}
+
+impl AccessorData for i32 {
+    fn read<B, R>(reader: &mut R) -> io::Result<Self>
+        where B: byteorder::ByteOrder, R: byteorder::ReadBytesExt
+    {
+        reader.read_i32::<B>()
+    }
+}
+
+impl AccessorData for u32 {
+    fn read<B, R>(reader: &mut R) -> io::Result<Self>
+        where B: byteorder::ByteOrder, R: byteorder::ReadBytesExt
+    {
+        reader.read_u32::<B>()
+    }
+}
+
+impl<T: AccessorData> AccessorData for [T; 1] {
+    fn read<B, R>(reader: &mut R) -> io::Result<Self>
+        where B: byteorder::ByteOrder, R: byteorder::ReadBytesExt
+    {
+        Ok([T::read::<B, R>(reader)?])
+    }
+}
+
+impl<T: AccessorData> AccessorData for [T; 2] {
+    fn read<B, R>(reader: &mut R) -> io::Result<Self>
+        where B: byteorder::ByteOrder, R: byteorder::ReadBytesExt
+    {
+        Ok([T::read::<B, R>(reader)?, T::read::<B, R>(reader)?])
+    }
+
+}
+
+impl<T: AccessorData> AccessorData for [T; 3] {
+    fn read<B, R>(reader: &mut R) -> io::Result<Self>
+        where B: byteorder::ByteOrder, R: byteorder::ReadBytesExt
+    {
+        Ok([T::read::<B, R>(reader)?, T::read::<B, R>(reader)?, T::read::<B, R>(reader)?])
+    }
+
+}
+
+impl<T: AccessorData> AccessorData for [T; 4] {
+    fn read<B, R>(reader: &mut R) -> io::Result<Self>
+        where B: byteorder::ByteOrder, R: byteorder::ReadBytesExt
+    {
+        Ok([T::read::<B, R>(reader)?, T::read::<B, R>(reader)?, T::read::<B, R>(reader)?, T::read::<B, R>(reader)?])
+    }
+
+}
 
 /// Helper trait for denormalizing integer types.
 ///
@@ -164,45 +262,46 @@ impl<'a> PrimitiveIterators<'a> for gltf::Primitive<'a> {
 
 /// Visits the items in an `Accessor`.
 #[derive(Clone, Debug)]
-pub struct AccessorIter<'a, T> {
+pub struct AccessorIter<'a, T: AccessorData> {
     /// The total number of iterations left.
     count: usize,
 
     /// The index of the next iteration.
     index: usize,
 
-    /// The number of bytes between each item.
-    stride: usize,
+    /// The number of bytes to advance between each iteration.
+    advance: i64,
 
-    /// Byte offset into the buffer view where the items begin.
-    offset: usize,
-    
     /// The data we're iterating over.
-    data: &'a [u8],
+    cursor: io::Cursor<&'a [u8]>,
 
     /// The accessor we're iterating over.
     accessor: gltf::Accessor<'a>,
-    
+
     /// Consumes the data type we're returning at each iteration.
     _marker: marker::PhantomData<T>,
 }
 
-impl<'a, T> AccessorIter<'a, T> {
+impl<'a, T: AccessorData> AccessorIter<'a, T> {
     pub fn new<S>(accessor: gltf::Accessor<'a>, source: &'a S) -> AccessorIter<'a, T>
-        where S: Source
+        where S: Source,
     {
         assert_eq!(mem::size_of::<T>(), accessor.size());
+        assert!(mem::align_of::<T>() <= 4);
         let view = accessor.view();
         let buffer = view.buffer();
         let buffer_data = source.source_buffer(&buffer);
         let view_data = &buffer_data[view.offset()..(view.offset() + view.length())];
+        let mut cursor = io::Cursor::new(view_data);
+        cursor.set_position(accessor.offset() as u64);
+        let advance = view.stride().unwrap_or(mem::size_of::<T>()) as i64 - accessor.size() as i64;
+        let count = accessor.count();
         AccessorIter {
+            accessor,
+            advance,
+            count,
+            cursor,
             index: 0,
-            stride: view.stride().unwrap_or(mem::size_of::<T>()),
-            offset: accessor.offset(),
-            count: accessor.count(),
-            accessor: accessor,
-            data: view_data,
             _marker: marker::PhantomData,
         }
     }
@@ -320,14 +419,17 @@ pub struct ColorsRgbaF32<'a> {
     default_alpha: f32,
 }
 
-impl<'a, T: Copy> ExactSizeIterator for AccessorIter<'a, T> {}
-impl<'a, T: Copy> Iterator for AccessorIter<'a, T> {
+impl<'a, T: AccessorData> ExactSizeIterator for AccessorIter<'a, T> {}
+impl<'a, T: AccessorData> Iterator for AccessorIter<'a, T> {
     type Item = T;
     fn next(&mut self) -> Option<Self::Item> {
+        use io::Seek;
         if self.index < self.count {
-            let offset = self.offset + self.index * self.stride;
-            let ptr = unsafe { self.data.as_ptr().offset(offset as isize) };
-            let value: T = unsafe { mem::transmute_copy(&*ptr) };
+            let value = T::read::<byteorder::LE, _>(&mut self.cursor)
+                .expect("accessor read error");
+            let _ = self.cursor
+                .seek(io::SeekFrom::Current(self.advance))
+                .expect("accessor seek error");
             self.index += 1;
             Some(value)
         } else {
