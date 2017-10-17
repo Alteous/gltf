@@ -177,11 +177,11 @@ fn validate_standard(
     config: &Config,
 ) -> Result<Gltf, Error> {
     use config::ValidationStrategy;
-    Ok(match config.validation_strategy {
-        ValidationStrategy::Skip => unvalidated.skip_validation(),
-        ValidationStrategy::Minimal => unvalidated.validate_minimally()?,
-        ValidationStrategy::Complete => unvalidated.validate_completely()?,
-    })
+    match config.validation_strategy {
+        ValidationStrategy::Skip => Ok(unvalidated.skip_validation()),
+        ValidationStrategy::Minimal => unvalidated.validate_minimally(),
+        ValidationStrategy::Complete => unvalidated.validate_completely(),
+    }.map_err(Error::Gltf)
 }
 
 fn validate_binary(
@@ -280,10 +280,7 @@ impl From<Vec<(json::Path, validation::Error)>> for Error {
 
 impl From<gltf::Error> for Error {
     fn from(err: gltf::Error) -> Error {
-        match err {
-            gltf::Error::Validation(errs) => Error::Validation(errs),
-            _ => Error::Gltf(err),
-        }
+        Error::Gltf(err)
     }
 }
 
