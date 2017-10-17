@@ -109,28 +109,39 @@ pub mod skin;
 /// Textures and their samplers.
 pub mod texture;
 
+/// Validation data.
+pub mod validation;
+
 pub use self::animation::Animation;
 pub use self::accessor::Accessor;
 pub use self::buffer::Buffer;
 pub use self::camera::Camera;
 pub use self::glb::Glb;
-pub use self::gltf::{Gltf, Unvalidated};
+pub use self::gltf::Gltf;
 pub use self::image::Image;
 pub use self::material::Material;
 pub use self::mesh::{Attribute, Mesh, Primitive, Semantic};
 pub use self::scene::{Node, Scene};
 pub use self::skin::Skin;
 pub use self::texture::Texture;
+pub use self::validation::Unvalidated;
 
-/// Represents a runtime error.
+use std::{error, fmt};
+
+/// Generic runtime error provided for convenience.
+///
+/// Users may opt for module-level errors instead.
 #[derive(Debug)]
 pub enum Error {
     /// JSON deserialization error.
     Deserialize(json::Error),
     /// GLB parsing error.
-    Glb(self::glb::Error),
+    Glb(glb::Error),
     /// `glTF` validation error.
-    Validation(Vec<(json::Path, json::validation::Error)>),
+    Validation(validation::Error),
+    /// Intended to prevent use in `match` expressions.
+    #[doc(hidden)]
+    _Nonexhaustive,
 }
 
 /// Returns `true` if the slice begins with the `b"glTF"` magic string, indicating
@@ -146,25 +157,26 @@ pub fn is_binary(slice: &[u8]) -> bool {
     slice.starts_with(b"glTF")
 }
 
-impl std::fmt::Display for Error {
+impl fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         use std::error::Error;
         write!(f, "{}", self.description())
     }
 }
 
-impl std::error::Error for Error {
+impl error::Error for Error {
     fn description(&self) -> &str {
          match *self {
              Error::Deserialize(_) => "deserialization error",
              Error::Glb(ref e) => e.description(),
              Error::Validation(_) => "invalid glTF JSON",
+             _ => unreachable!(),
         }
     }
 }
 
-impl From<self::glb::Error> for Error {
-    fn from(err: self::glb::Error) -> Self {
+impl From<glb::Error> for Error {
+    fn from(err: glb::Error) -> Self {
         Error::Glb(err)
     }
 }
@@ -175,8 +187,8 @@ impl From<json::Error> for Error {
     }
 }
 
-impl From<Vec<(json::Path, json::validation::Error)>> for Error {
-    fn from(errs: Vec<(json::Path, json::validation::Error)>) -> Self {
-        Error::Validation(errs)
+impl From<validation::Error> for Error {
+    fn from(err: validation::Error) -> Self {
+        Error::Validation(err)
     }
 }

@@ -14,7 +14,7 @@ use std::{fmt, io};
 #[derive(Debug)]
 pub enum Error {
     /// Io error occured.
-    Io(::std::io::Error),
+    Io(io::Error),
     /// Unsupported version.
     Version(u32),
     /// Magic says that file is not glTF.
@@ -124,7 +124,7 @@ impl<'a> Glb<'a> {
     /// * Mandatory GLB header.
     /// * Mandatory JSON chunk.
     /// * Optional BIN chunk.
-    pub fn from_slice(mut data: &'a [u8]) -> Result<Self, ::Error> {
+    pub fn from_slice(mut data: &'a [u8]) -> Result<Self, Error> {
         let header = Header::from_reader(&mut data)
             .and_then(|header| {
                 let contents_length = header.length as usize - Header::size_of();
@@ -136,22 +136,21 @@ impl<'a> Glb<'a> {
                         length_read: data.len(),
                     })
                 }
-            })
-            .map_err(::Error::Glb)?;
+            })?;
         match header.version {
-            2 => Self::from_v2(data)
-                .map(|(json, bin)| Glb { header, json, bin })
-                .map_err(::Error::Glb),
-            x => Err(::Error::Glb(Error::Version(x)))
+            2 => Self::from_v2(data).map(|(json, bin)| Glb { header, json, bin }),
+            x => Err(Error::Version(x)),
         }
     }
 
     /// Does the loading job for you.  Provided buf will be cleared before new
     /// data will be written.  When error happens, if only header was read, buf
     /// will not be mutated, otherwise, buf will be empty.
-    pub fn from_reader<R: io::Read>(mut reader: R, buf: &'a mut Vec<u8>)
-                                    -> Result<Self, ::Error> {
-        let header = Header::from_reader(&mut reader).map_err(::Error::Glb)?;
+    pub fn from_reader<R: io::Read>(
+        mut reader: R,
+        buf: &'a mut Vec<u8>,
+    ) -> Result<Self, Error> {
+        let header = Header::from_reader(&mut reader)?;
         match header.version {
             2 => {
                 let glb_len = header.length - Header::size_of() as u32;
@@ -171,14 +170,12 @@ impl<'a> Glb<'a> {
                     // SAFETY: It is safe to not run destructors because u8 has
                     // none.
                     unsafe { buf.set_len(0) };
-                    Err(::Error::Glb(e))
+                    Err(e)
                 } else {
-                    Self::from_v2(buf)
-                       .map(|(json, bin)| Glb { header, json, bin })
-                       .map_err(::Error::Glb)
+                    Self::from_v2(buf).map(|(json, bin)| Glb { header, json, bin })
                 }
             }
-            x => Err(::Error::Glb(Error::Version(x)))
+            x => Err(Error::Version(x))
         }
     }
 

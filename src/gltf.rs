@@ -21,6 +21,7 @@ use mesh::Mesh;
 use scene::{Node, Scene};
 use skin::Skin;
 use texture::{Sampler, Texture};
+use validation::Unvalidated;
 
 use Error;
 
@@ -33,9 +34,6 @@ pub struct Gltf {
 /// An `Iterator` that visits extension strings.
 #[derive(Clone, Debug)]
 pub struct Extensions<'a>(slice::Iter<'a, String>);
-
-/// Represents `glTF` that hasn't been validated yet.
-pub struct Unvalidated(Gltf);
 
 /// An `Iterator` that visits every accessor in a glTF asset.
 #[derive(Clone, Debug)]
@@ -165,68 +163,6 @@ pub struct Textures<'a> {
 
     /// The internal root glTF object.
     gltf: &'a Gltf,
-}
-
-impl Unvalidated {
-    /// Returns the unvalidated JSON.
-    pub fn as_json(&self) -> &json::Root {
-        self.0.as_json()
-    }
-
-    /// Skip validation.  **Using this is highly recommended against** as
-    /// malformed glTF assets might lead to program panics, huge values, NaNs
-    /// and general evil deeds.
-    ///
-    /// # Panics
-    ///
-    /// This function does not panic, but might cause an inherent panic later in
-    /// your program during reading of the malformed asset.
-    pub fn skip_validation(self) -> Gltf {
-        self.0
-    }
-
-    /// Validates only the invariants required for the library to function safely.
-    pub fn validate_minimally(self) -> Result<Gltf, Error> {
-        use json::validation::Validate;
-        let mut errs = vec![];
-        {
-            let json = self.as_json();
-            json.validate_minimally(
-                json,
-                json::Path::new,
-                &mut |path, err| errs.push((path(), err)),
-            );
-        }
-        if errs.is_empty() {
-            Ok(self.0)
-        } else {
-            Err(Error::Validation(errs))
-        }
-    }
-
-    /// Validates the data against the `glTF` 2.0 specification.
-    pub fn validate_completely(self) -> Result<Gltf, Error> {
-        use json::validation::Validate;
-        let mut errs = vec![];
-        {
-            let json = self.as_json();
-            json.validate_minimally(
-                json,
-                json::Path::new,
-                &mut |path, err| errs.push((path(), err)),
-            );
-            json.validate_completely(
-                json,
-                json::Path::new,
-                &mut |path, err| errs.push((path(), err)),
-            );
-        }
-        if errs.is_empty() {
-            Ok(self.0)
-        } else {
-            Err(Error::Validation(errs))
-        }
-    }
 }
 
 impl Gltf {
