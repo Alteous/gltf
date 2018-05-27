@@ -1,11 +1,11 @@
 use {buffer, extensions, Extras, Index};
-use serde::de;
+use serde::{de, ser};
 use serde_json::Value;
 use std::fmt;
 use validation::Checked;
 
 /// The component data type.
-#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize)]
 pub enum ComponentType {
     /// Corresponds to `GL_BYTE`.
     I8 = 1,
@@ -27,7 +27,7 @@ pub enum ComponentType {
 }
 
 /// Specifies whether an attribute, vector, or matrix.
-#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize)]
 pub enum Type {
     /// Scalar quantity.
     Scalar = 1,
@@ -43,7 +43,7 @@ pub enum Type {
 
     /// 2x2 matrix.
     Mat2,
-
+    
     /// 3x3 matrix.
     Mat3,
 
@@ -228,7 +228,7 @@ pub struct Accessor {
     /// Specifies whether integer data values should be normalized.
     #[serde(default)]
     pub normalized: bool,
-
+    
     /// Sparse storage of attributes that deviate from their initialization
     /// value.
     #[serde(default)]
@@ -337,6 +337,23 @@ impl<'de> de::Deserialize<'de> for Checked<Type> {
     }
 }
 
+impl ser::Serialize for Type {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: ser::Serializer
+    {
+        serializer.serialize_str(match *self {
+            Type::Scalar => "SCALAR",
+            Type::Vec2 => "VEC2",
+            Type::Vec3 => "VEC3",
+            Type::Vec4 => "VEC4",
+            Type::Mat2 => "MAT2",
+            Type::Mat3 => "MAT3",
+            Type::Mat4 => "MAT4",
+        })
+    }
+}
+
 impl ComponentType {
     /// Returns the number of bytes this value represents.
     pub fn size(&self) -> usize {
@@ -346,6 +363,27 @@ impl ComponentType {
             I16 | U16 => 2,
             F32 | U32 => 4,
         }
+    }
+
+    /// Returns the corresponding `GLenum`.
+    pub fn as_gl_enum(self) -> u32 {
+        match self {
+            ComponentType::I8 => BYTE,
+            ComponentType::U8 => UNSIGNED_BYTE,
+            ComponentType::I16 => SHORT,
+            ComponentType::U16 => UNSIGNED_SHORT,
+            ComponentType::U32 => UNSIGNED_INT,
+            ComponentType::F32 => FLOAT,
+        }
+    }
+}
+
+impl ser::Serialize for ComponentType {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: ser::Serializer
+    {
+        serializer.serialize_u32(self.as_gl_enum())
     }
 }
 

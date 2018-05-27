@@ -1,14 +1,14 @@
 use json;
 
-use Gltf;
+use {Document};
 
 pub use json::buffer::Target;
 
 /// A buffer points to binary data representing geometry, animations, or skins.
 #[derive(Clone, Debug)]
 pub struct Buffer<'a> {
-    /// The parent `Gltf` struct.
-    gltf: &'a Gltf,
+    /// The parent `Document` struct.
+    document: &'a Document,
 
     /// The corresponding JSON index.
     index: usize,
@@ -20,8 +20,8 @@ pub struct Buffer<'a> {
 /// A view into a buffer generally representing a subset of the buffer.
 #[derive(Clone, Debug)]
 pub struct View<'a> {
-    /// The parent `Gltf` struct.
-    gltf: &'a Gltf,
+    /// The parent `Document` struct.
+    document: &'a Document,
 
     /// The corresponding JSON index.
     index: usize,
@@ -33,15 +33,30 @@ pub struct View<'a> {
     parent: Buffer<'a>,
 }
 
+/// Describes a buffer data source.
+#[derive(Clone, Debug)]
+pub enum Source<'a> {
+    /// Buffer data is contained in the `BIN` section of binary glTF.
+    Bin,
+
+    /// Buffer data is contained in an external data source.
+    Uri(&'a str),
+}
+
+/// Buffer data belonging to an imported glTF asset.
+#[cfg(feature = "import")]
+#[derive(Clone, Debug)]
+pub struct Data(pub Vec<u8>);
+
 impl<'a> Buffer<'a> {
     /// Constructs a `Buffer`.
     pub(crate) fn new(
-        gltf: &'a Gltf,
+        document: &'a Document,
         index: usize,
         json: &'a json::buffer::Buffer,
     ) -> Self {
         Self {
-            gltf: gltf,
+            document: document,
             index: index,
             json: json,
         }
@@ -52,21 +67,13 @@ impl<'a> Buffer<'a> {
         self.index
     }
 
-    /// Returns the internal JSON item.
-    #[doc(hidden)]
-    pub fn as_json(&self) ->  &json::buffer::Buffer {
-        self.json
-    }
-
-    /// Returns the uniform resource identifier for the buffer data.
-    ///
-    /// # Notes
-    ///
-    /// When the buffer is sourced from the `BIN` section of binary glTF, the
-    /// fragment `"#bin"` is returned. This is non-standard according to the
-    /// glTF specification.
-    pub fn uri(&self) -> &str {
-        self.json.uri.as_ref().map(String::as_str).unwrap_or("#bin")
+    /// Returns the buffer data source.
+    pub fn source(&self) -> Source<'a> {
+        if let Some(uri) = self.json.uri.as_ref().map(String::as_str) {
+            Source::Uri(uri)
+        } else {
+            Source::Bin
+        }
     }
 
     /// The length of the buffer in bytes.
@@ -89,13 +96,13 @@ impl<'a> Buffer<'a> {
 impl<'a> View<'a> {
     /// Constructs a `View`.
     pub(crate) fn new(
-        gltf: &'a Gltf,
+        document: &'a Document,
         index: usize,
         json: &'a json::buffer::View,
     ) -> Self {
-        let parent = gltf.buffers().nth(json.buffer.value()).unwrap();
+        let parent = document.buffers().nth(json.buffer.value()).unwrap();
         Self {
-            gltf,
+            document,
             index,
             json,
             parent,
@@ -107,15 +114,9 @@ impl<'a> View<'a> {
         self.index
     }
 
-    /// Returns the internal JSON item.
-    #[doc(hidden)]
-    pub fn as_json(&self) ->  &json::buffer::View {
-        self.json
-    }
-
     /// Returns the parent `Buffer`.
     pub fn buffer(&self) -> Buffer<'a> {
-        self.gltf.buffers().nth(self.json.buffer.value()).unwrap()
+        self.document.buffers().nth(self.json.buffer.value()).unwrap()
     }
 
     /// Returns the length of the buffer view in bytes.

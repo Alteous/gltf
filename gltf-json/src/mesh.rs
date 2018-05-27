@@ -45,7 +45,7 @@ pub const VALID_MORPH_TARGETS: &'static [&'static str] = &[
 ];
 
 /// The type of primitives to render.
-#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq)]
 pub enum Mode {
     /// Corresponds to `GL_POINTS`.
     Points = 1,
@@ -148,29 +148,30 @@ pub struct Primitive {
                 .validate_minimally(root, || path().field("targets"), report);
 
             // Custom part
+            let position_path = &|| path().field("attributes").key("POSITION");
             if let Some(pos_accessor_index) = self.attributes.get(&Checked::Valid(Semantic::Positions)) {
                 // spec: POSITION accessor **must** have `min` and `max` properties defined.
                 let pos_accessor = &root.accessors[pos_accessor_index.value()];
 
-                let min_path = &|| path().field("attributes").key("POSITION").field("min");
+                let min_path = &|| position_path().field("min");
                 if let Some(ref min) = pos_accessor.min {
                     if from_value::<[f32; 3]>(min.clone()).is_err() {
                         report(min_path, Error::Invalid);
                     }
-                }
-                else {
+                } else {
                     report(min_path, Error::Missing);
                 }
 
-                let max_path = &|| path().field("attributes").key("POSITION").field("max");
+                let max_path = &|| position_path().field("max");
                 if let Some(ref max) = pos_accessor.max {
                     if from_value::<[f32; 3]>(max.clone()).is_err() {
                         report(max_path, Error::Invalid);
                     }
-                }
-                else {
+                } else {
                     report(max_path, Error::Missing);
                 }
+            } else {
+                report(position_path, Error::Missing);
             }
         }
     }
@@ -227,6 +228,21 @@ impl Default for Mode {
     }
 }
 
+impl Mode {
+    /// Returns the equivalent `GLenum`.
+    pub fn as_gl_enum(self) -> u32 {
+        match self {
+            Mode::Points => POINTS,
+            Mode::Lines => LINES,
+            Mode::LineLoop => LINE_LOOP,
+            Mode::LineStrip => LINE_STRIP,
+            Mode::Triangles => TRIANGLES,
+            Mode::TriangleStrip => TRIANGLE_STRIP,
+            Mode::TriangleFan => TRIANGLE_FAN,
+        }
+    }
+}
+
 impl<'de> de::Deserialize<'de> for Checked<Mode> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
         where D: de::Deserializer<'de>
@@ -257,6 +273,15 @@ impl<'de> de::Deserialize<'de> for Checked<Mode> {
             }
         }
         deserializer.deserialize_u64(Visitor)
+    }
+}
+
+impl ser::Serialize for Mode {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: ser::Serializer,
+    {
+        serializer.serialize_u32(self.as_gl_enum())
     }
 }
 

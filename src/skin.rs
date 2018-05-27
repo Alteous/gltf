@@ -1,13 +1,20 @@
 use json;
 use std::slice;
 
-use {Accessor, Gltf, Node};
+use {Accessor, Buffer, Document, Node};
+
+#[cfg(feature = "utils")]
+use accessor;
+
+/// Inverse Bind Matrices of type `[[f32; 4]; 4]`.
+#[cfg(feature = "utils")]
+pub type ReadInverseBindMatrices<'a> = accessor::Iter<'a, [[f32; 4]; 4]>;
 
 /// Joints and matrices defining a skin.
 #[derive(Clone, Debug)]
 pub struct Skin<'a> {
-    /// The parent `Gltf` struct.
-    gltf: &'a Gltf,
+    /// The parent `Document` struct.
+    document: &'a Document,
 
     /// The corresponding JSON index.
     index: usize,
@@ -19,22 +26,33 @@ pub struct Skin<'a> {
 /// An `Iterator` that visits the joints of a `Skin`.
 #[derive(Clone, Debug)]
 pub struct Joints<'a> {
-    /// The parent `Gltf` struct.
-    gltf: &'a Gltf,
+    /// The parent `Document` struct.
+    document: &'a Document,
 
     /// The internal node index iterator.
     iter: slice::Iter<'a, json::Index<json::scene::Node>>,
 }
 
+/// Skin reader.
+#[cfg(feature = "utils")]
+#[derive(Clone, Debug)]
+pub struct Reader<'a, 's, F>
+where
+    F: Clone + Fn(Buffer<'a>) -> Option<&'s [u8]>,
+{
+    skin: Skin<'a>,
+    get_buffer_data: F,
+}
+
 impl<'a> Skin<'a> {
     /// Constructs a `Skin`.
     pub(crate) fn new(
-        gltf: &'a Gltf,
+        document: &'a Document,
         index: usize,
         json: &'a json::skin::Skin,
     ) -> Self {
         Self {
-            gltf: gltf,
+            document: document,
             index: index,
             json: json,
         }
@@ -43,12 +61,6 @@ impl<'a> Skin<'a> {
     /// Returns the internal JSON index.
     pub fn index(&self) -> usize {
         self.index
-    }
-
-    /// Returns the internal JSON item.
-    #[doc(hidden)]
-    pub fn as_json(&self) ->  &json::skin::Skin {
-        self.json
     }
 
     /// Optional application specific data.
@@ -64,18 +76,33 @@ impl<'a> Skin<'a> {
         self.json.inverse_bind_matrices
             .as_ref()
             .map(|index| {
-                self.gltf
+                self.document
                     .accessors()
                     .nth(index.value())
                     .unwrap()
             })
     }
 
+    /// Constructs a skin reader.
+    #[cfg(feature = "utils")]
+    pub fn reader<'s, F>(
+        &'a self,
+        get_buffer_data: F,
+    ) -> Reader<'a, 's, F>
+    where
+        F: Clone + Fn(Buffer<'a>) -> Option<&'s [u8]>,
+    {
+        Reader {
+            skin: self.clone(),
+            get_buffer_data,
+        }
+    }
+
     /// Returns an `Iterator` that visits the skeleton nodes used as joints in
     /// this skin.
     pub fn joints(&self) -> Joints<'a> {
         Joints {
-            gltf: self.gltf,
+            document: self.document,
             iter: self.json.joints.iter(),
         }
     }
@@ -90,8 +117,26 @@ impl<'a> Skin<'a> {
     /// transforms resolve to scene root.
     pub fn skeleton(&self) -> Option<Node<'a>> {
         self.json.skeleton.as_ref().map(|index| {
-            self.gltf.nodes().nth(index.value()).unwrap()
+            self.document.nodes().nth(index.value()).unwrap()
         })
+    }
+}
+
+#[cfg(feature = "utils")]
+impl<'a, 's, F> Reader<'a, 's, F>
+where
+    F: Clone + Fn(Buffer<'a>) -> Option<&'s [u8]>,
+{
+    /// Returns an `Iterator` that reads the inverse bind matrices of
+    /// the skin.
+    pub fn read_inverse_bind_matrices(&self) -> Option<ReadInverseBindMatrices<'s>> {
+        if let Some(accessor) = self.skin.inverse_bind_matrices() {
+            if let Some(slice) = (self.get_buffer_data)(accessor.view().buffer()) {
+                return Some(accessor::Iter::new(accessor, slice))
+            }
+        }
+
+        None
     }
 }
 
@@ -100,6 +145,6 @@ impl<'a> Iterator for Joints<'a>  {
     fn next(&mut self) -> Option<Self::Item> {
         self.iter
             .next()
-            .map(|index| self.gltf.nodes().nth(index.value()).unwrap())
+            .map(|index| self.document.nodes().nth(index.value()).unwrap())
     }
 }

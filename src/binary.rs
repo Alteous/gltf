@@ -1,5 +1,5 @@
-use byteorder::{LE, ReadBytesExt};
-use std::{fmt, io};
+use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
+use std::{fmt, io, mem};
 use std::borrow::Cow;
 
 /// Represents a Glb loader error.
@@ -46,6 +46,7 @@ pub struct Glb<'a> {
 
 /// The header section of a .glb file.
 #[derive(Copy, Clone, Debug)]
+#[repr(C)]
 pub struct Header {
     /// Must be `b"glTF"`.
     pub magic: [u8; 4],
@@ -58,14 +59,15 @@ pub struct Header {
 /// GLB chunk type.
 #[derive(Copy, Clone, Debug)]
 pub enum ChunkType {
-    /// JSON chunk.
+    /// `JSON` chunk.
     Json,
-    /// BIN\0 chunk.
+    /// `BIN` chunk.
     Bin,
 }
 
 /// Chunk header with no data read yet.
 #[derive(Copy, Clone, Debug)]
+#[repr(C)]
 struct ChunkHeader {
     /// The length of the chunk data in byte excluding the header.
     length: u32,
@@ -84,8 +86,8 @@ impl Header {
         if &magic == b"glTF" {
             Ok(Self {
                 magic,
-                version: reader.read_u32::<LE>().map_err(Io)?,
-                length: reader.read_u32::<LE>().map_err(Io)?,
+                version: reader.read_u32::<LittleEndian>().map_err(Io)?,
+                length: reader.read_u32::<LittleEndian>().map_err(Io)?,
             })
         } else {
             Err(Error::Magic(magic))
@@ -98,7 +100,7 @@ impl Header {
 impl ChunkHeader {
     fn from_reader<R: io::Read>(mut reader: R) -> Result<Self, Error> {
         use self::Error::Io;
-        let length = reader.read_u32::<LE>().map_err(Io)?;
+        let length = reader.read_u32::<LittleEndian>().map_err(Io)?;
         let mut ty = [0; 4];
         reader.read_exact(&mut ty).map_err(Io)?;
         let ty = match &ty {
@@ -110,7 +112,77 @@ impl ChunkHeader {
     }
 }
 
+fn align_to_multiple_of_four(n: &mut usize) {
+    *n = (*n + 3) & !3;
+}
+
 impl<'a> Glb<'a> {
+    /// Writes binary glTF to a writer.
+    pub fn to_writer<W>(&self, mut writer: W) -> Result<(), ::Error>
+        where W: io::Write
+    {
+        // Write GLB header
+        {
+            let magic = b"glTF";
+            let version = 2;
+            let mut length = mem::size_of::<Header>() + mem::size_of::<ChunkHeader>() + self.json.len();
+            align_to_multiple_of_four(&mut length);
+            if let Some(bin) = self.bin.as_ref() {
+                length += mem::size_of::<ChunkHeader>() + bin.len();
+                align_to_multiple_of_four(&mut length);
+            }
+
+            writer.write_all(&magic[..])?;
+            writer.write_u32::<LittleEndian>(version)?;
+            writer.write_u32::<LittleEndian>(length as u32)?;
+        }
+
+        // Write JSON chunk header
+        {
+            let magic = b"JSON";
+            let mut length = self.json.len();
+            align_to_multiple_of_four(&mut length);
+            let padding = length - self.json.len();
+
+            writer.write_u32::<LittleEndian>(length as u32)?;
+            writer.write_all(&magic[..])?;
+            writer.write_all(&self.json)?;
+            for _ in 0..padding {
+                writer.write_u8(0)?;
+            }
+        }
+
+        if let Some(bin) = self.bin.as_ref() {
+            let magic = b"BIN\0";
+            let mut length = bin.len();
+            align_to_multiple_of_four(&mut length);
+            let padding = length - bin.len();
+
+            writer.write_u32::<LittleEndian>(length as u32)?;
+            writer.write_all(&magic[..])?;
+            writer.write_all(&bin)?;
+            for _ in 0..padding {
+                writer.write_u8(0)?;
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Writes binary glTF to a byte vector.
+    pub fn to_vec(&self) -> Result<Vec<u8>, ::Error> {
+        let mut length = mem::size_of::<Header>() + mem::size_of::<ChunkHeader>() + self.json.len();
+        align_to_multiple_of_four(&mut length);
+        if let Some(bin) = self.bin.as_ref() {
+            length += mem::size_of::<ChunkHeader>() + bin.len();
+            align_to_multiple_of_four(&mut length);
+        }
+
+        let mut vec = Vec::with_capacity(length);
+        self.to_writer(&mut vec as &mut io::Write)?;
+        Ok(vec)
+    }
+
     /// Splits loaded GLB into its three chunks.
     ///
     /// * Mandatory GLB header.
@@ -129,12 +201,12 @@ impl<'a> Glb<'a> {
                     })
                 }
             })
-            .map_err(::Error::Glb)?;
+            .map_err(::Error::Binary)?;
         match header.version {
             2 => Self::from_v2(data)
                 .map(|(json, bin)| Glb { header, json: json.into(), bin: bin.map(Into::into) })
-                .map_err(::Error::Glb),
-            x => Err(::Error::Glb(Error::Version(x)))
+                .map_err(::Error::Binary),
+            x => Err(::Error::Binary(Error::Version(x)))
         }
     }
 
@@ -142,13 +214,13 @@ impl<'a> Glb<'a> {
     /// data will be written.  When error happens, if only header was read, buf
     /// will not be mutated, otherwise, buf will be empty.
     pub fn from_reader<R: io::Read>(mut reader: R) -> Result<Self, ::Error> {
-        let header = Header::from_reader(&mut reader).map_err(::Error::Glb)?;
+        let header = Header::from_reader(&mut reader).map_err(::Error::Binary)?;
         match header.version {
             2 => {
                 let glb_len = header.length - Header::size_of() as u32;
                 let mut buf = vec![0; glb_len as usize];
                 if let Err(e) = reader.read_exact(&mut buf).map_err(Error::Io) {
-                    Err(::Error::Glb(e))
+                    Err(::Error::Binary(e))
                 } else {
                     Self::from_v2(&buf)
                         .map(|(json, bin)| Glb {
@@ -156,10 +228,10 @@ impl<'a> Glb<'a> {
                             json: json.to_vec().into(),
                             bin: bin.map(<[u8]>::to_vec).map(Into::into),
                         })
-                        .map_err(::Error::Glb)
+                        .map_err(::Error::Binary)
                 }
             }
-            x => Err(::Error::Glb(Error::Version(x)))
+            x => Err(::Error::Binary(Error::Version(x)))
         }
     }
 

@@ -1,10 +1,10 @@
 use std::marker::PhantomData;
 
-use Indices;
+use mesh::util::ReadIndices;
 
 /// Casting iterator for `Indices`.
 #[derive(Clone, Debug)]
-pub struct CastingIter<'a, T>(Indices<'a>, PhantomData<T>);
+pub struct CastingIter<'a, T>(ReadIndices<'a>, PhantomData<T>);
 
 /// Type which describes how to cast any index into u32.
 #[derive(Clone, Debug)]
@@ -26,42 +26,43 @@ pub trait Cast {
 }
 
 impl<'a, A> CastingIter<'a, A> {
-    pub(crate) fn new(iter: Indices<'a>) -> Self {
+    pub(crate) fn new(iter: ReadIndices<'a>) -> Self {
         CastingIter(iter, PhantomData)
     }
 
     /// Unwrap underlying `Indices` object.
-    pub fn unwrap(self) -> Indices<'a> {
+    pub fn unwrap(self) -> ReadIndices<'a> {
         self.0
     }
 }
 
+impl<'a, A: Cast> ExactSizeIterator for CastingIter<'a, A> {}
 impl<'a, A: Cast> Iterator for CastingIter<'a, A> {
     type Item = A::Output;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         match self.0 {
-            Indices::U8(ref mut i)  => i.next().map(A::cast_u8),
-            Indices::U16(ref mut i) => i.next().map(A::cast_u16),
-            Indices::U32(ref mut i) => i.next().map(A::cast_u32),
+            ReadIndices::U8(ref mut i)  => i.next().map(A::cast_u8),
+            ReadIndices::U16(ref mut i) => i.next().map(A::cast_u16),
+            ReadIndices::U32(ref mut i) => i.next().map(A::cast_u32),
         }
     }
 
     #[inline]
     fn nth(&mut self, x: usize) -> Option<Self::Item> {
         match self.0 {
-            Indices::U8(ref mut i)  => i.nth(x).map(A::cast_u8),
-            Indices::U16(ref mut i) => i.nth(x).map(A::cast_u16),
-            Indices::U32(ref mut i) => i.nth(x).map(A::cast_u32),
+            ReadIndices::U8(ref mut i)  => i.nth(x).map(A::cast_u8),
+            ReadIndices::U16(ref mut i) => i.nth(x).map(A::cast_u16),
+            ReadIndices::U32(ref mut i) => i.nth(x).map(A::cast_u32),
         }
     }
 
     fn last(self) -> Option<Self::Item> {
         match self.0 {
-            Indices::U8(i)  => i.last().map(A::cast_u8),
-            Indices::U16(i) => i.last().map(A::cast_u16),
-            Indices::U32(i) => i.last().map(A::cast_u32),
+            ReadIndices::U8(i)  => i.last().map(A::cast_u8),
+            ReadIndices::U16(i) => i.last().map(A::cast_u16),
+            ReadIndices::U32(i) => i.last().map(A::cast_u32),
         }
     }
 
@@ -72,9 +73,9 @@ impl<'a, A: Cast> Iterator for CastingIter<'a, A> {
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
         match self.0 {
-            Indices::U8(ref i)  => i.size_hint(),
-            Indices::U16(ref i) => i.size_hint(),
-            Indices::U32(ref i) => i.size_hint(),
+            ReadIndices::U8(ref i)  => i.size_hint(),
+            ReadIndices::U16(ref i) => i.size_hint(),
+            ReadIndices::U32(ref i) => i.size_hint(),
         }
     }
 }

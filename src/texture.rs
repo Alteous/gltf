@@ -1,4 +1,4 @@
-use {image, json, Gltf};
+use {image, json, Document};
 
 pub use json::texture::{MagFilter, MinFilter, WrappingMode};
 
@@ -19,9 +19,9 @@ pub struct Info<'a> {
 ///  Texture sampler properties for filtering and wrapping modes.
 #[derive(Clone, Debug)]
 pub struct Sampler<'a> {
-    /// The parent `Gltf` struct.
+    /// The parent `Document` struct.
     #[allow(dead_code)]
-    gltf: &'a Gltf,
+    document: &'a Document,
 
     /// The corresponding JSON index - `None` when the default sampler.
     index: Option<usize>,
@@ -33,8 +33,8 @@ pub struct Sampler<'a> {
 /// A texture and its sampler.
 #[derive(Clone, Debug)]
 pub struct Texture<'a> {
-    /// The parent `Gltf` struct.
-    gltf: &'a Gltf,
+    /// The parent `Document` struct.
+    document: &'a Document,
 
     /// The corresponding JSON index.
     index: usize,
@@ -46,21 +46,21 @@ pub struct Texture<'a> {
 impl<'a> Sampler<'a> {
     /// Constructs a `Sampler`.
     pub(crate) fn new(
-        gltf: &'a Gltf,
+        document: &'a Document,
         index: usize,
         json: &'a json::texture::Sampler,
     ) -> Self {
         Self {
-            gltf: gltf,
+            document: document,
             index: Some(index),
             json: json,
         }
     }
 
     /// Constructs the default `Sampler`.
-    pub(crate) fn default(gltf: &'a Gltf) -> Self {
+    pub(crate) fn default(document: &'a Document) -> Self {
         Self {
-            gltf: gltf,
+            document: document,
             index: None,
             json: &DEFAULT_SAMPLER,
         }
@@ -71,12 +71,6 @@ impl<'a> Sampler<'a> {
     /// This function returns `None` if the `Sampler` is the default sampler.
     pub fn index(&self) -> Option<usize> {
         self.index
-    }
-
-    /// Returns the internal JSON item.
-    #[doc(hidden)]
-    pub fn as_json(&self) ->  &json::texture::Sampler {
-        self.json
     }
 
     /// Magnification filter.
@@ -114,12 +108,12 @@ impl<'a> Sampler<'a> {
 impl<'a> Texture<'a> {
     /// Constructs a `Texture`.
     pub(crate) fn new(
-        gltf: &'a Gltf,
+        document: &'a Document,
         index: usize,
         json: &'a json::texture::Texture,
     ) -> Self {
         Self {
-            gltf: gltf,
+            document: document,
             index: index,
             json: json,
         }
@@ -128,12 +122,6 @@ impl<'a> Texture<'a> {
     /// Returns the internal JSON index.
     pub fn index(&self) -> usize {
         self.index
-    }
-
-    /// Returns the internal JSON item.
-    #[doc(hidden)]
-    pub fn as_json(&self) ->  &json::texture::Texture {
-        self.json
     }
 
     /// Optional user-defined name for this object.
@@ -146,13 +134,13 @@ impl<'a> Texture<'a> {
     pub fn sampler(&self) -> Sampler<'a> {
         self.json.sampler
             .as_ref()
-            .map(|index| self.gltf.samplers().nth(index.value() as usize).unwrap())
-            .unwrap_or_else(|| Sampler::default(self.gltf))
+            .map(|index| self.document.samplers().nth(index.value() as usize).unwrap())
+            .unwrap_or_else(|| Sampler::default(self.document))
     }
 
     /// Returns the image used by this texture.
     pub fn source(&self) -> image::Image<'a> {
-        self.gltf.images().nth(self.json.source.value() as usize).unwrap()
+        self.document.images().nth(self.json.source.value() as usize).unwrap()
     }
 
     /// Optional application specific data.
@@ -169,12 +157,6 @@ impl<'a> Info<'a> {
             texture: texture,
             json: json,
         }
-    }
-
-    /// Returns the internal JSON item.
-    #[doc(hidden)]
-    pub fn as_json(&self) ->  &json::texture::Info {
-        self.json
     }
 
     /// The set index of the texture's `TEXCOORD` attribute.

@@ -1,4 +1,4 @@
-use {json, Gltf};
+use {json, Document};
 
 /// A camera's projection.
 #[derive(Clone, Debug)]
@@ -14,8 +14,8 @@ pub enum Projection<'a> {
 /// place the camera in the scene.
 #[derive(Clone, Debug)]
 pub struct Camera<'a> {
-    /// The parent `Gltf` struct.
-    gltf: &'a Gltf,
+    /// The parent `Document` struct.
+    document: &'a Document,
 
     /// The corresponding JSON index.
     index: usize,
@@ -27,8 +27,8 @@ pub struct Camera<'a> {
 ///  Values for an orthographic camera projection.
 #[derive(Clone, Debug)]
 pub struct Orthographic<'a> {
-    /// The parent `Gltf` struct.
-    gltf: &'a Gltf,
+    /// The parent `Document` struct.
+    document: &'a Document,
 
     /// The corresponding JSON struct.
     json: &'a json::camera::Orthographic,
@@ -37,8 +37,8 @@ pub struct Orthographic<'a> {
 /// Values for a perspective camera projection.
 #[derive(Clone, Debug)]
 pub struct Perspective<'a> {
-    /// The parent `Gltf` struct.
-    gltf: &'a Gltf,
+    /// The parent `Document` struct.
+    document: &'a Document,
 
     /// The corresponding JSON struct.
     json: &'a json::camera::Perspective,
@@ -46,9 +46,9 @@ pub struct Perspective<'a> {
 
 impl<'a> Camera<'a> {
     /// Constructs a `Camera`.
-    pub(crate) fn new(gltf: &'a Gltf, index: usize, json: &'a json::camera::Camera) -> Self {
+    pub(crate) fn new(document: &'a Document, index: usize, json: &'a json::camera::Camera) -> Self {
         Self {
-            gltf: gltf,
+            document: document,
             index: index,
             json: json,
         }
@@ -57,12 +57,6 @@ impl<'a> Camera<'a> {
     /// Returns the internal JSON index.
     pub fn index(&self) -> usize {
         self.index
-    }
-
-    /// Returns the internal JSON item.
-    #[doc(hidden)]
-    pub fn as_json(&self) ->  &json::camera::Camera {
-        self.json
     }
 
     /// Optional user-defined name for this object.
@@ -76,11 +70,11 @@ impl<'a> Camera<'a> {
         match self.json.type_.unwrap() {
             json::camera::Type::Orthographic => {
                 let json = self.json.orthographic.as_ref().unwrap();
-                Projection::Orthographic(Orthographic::new(self.gltf, json))
+                Projection::Orthographic(Orthographic::new(self.document, json))
             },
             json::camera::Type::Perspective => {
                 let json = self.json.perspective.as_ref().unwrap();
-                Projection::Perspective(Perspective::new(self.gltf, json))
+                Projection::Perspective(Perspective::new(self.document, json))
             },
         }
     } 
@@ -93,17 +87,11 @@ impl<'a> Camera<'a> {
 
 impl<'a> Orthographic<'a> {
     /// Constructs a `Orthographic` camera projection.
-    pub(crate) fn new(gltf: &'a Gltf, json: &'a json::camera::Orthographic) -> Self {
+    pub(crate) fn new(document: &'a Document, json: &'a json::camera::Orthographic) -> Self {
         Self {
-            gltf: gltf,
+            document: document,
             json: json,
         }
-    }
-
-    /// Returns the internal JSON item.
-    #[doc(hidden)]
-    pub fn as_json(&self) ->  &json::camera::Orthographic {
-        self.json
     }
 
     ///  The horizontal magnification of the view.
@@ -134,17 +122,11 @@ impl<'a> Orthographic<'a> {
 
 impl<'a> Perspective<'a> {
     /// Constructs a `Perspective` camera projection.
-    pub(crate) fn new(gltf: &'a Gltf, json: &'a json::camera::Perspective) -> Self {
+    pub(crate) fn new(document: &'a Document, json: &'a json::camera::Perspective) -> Self {
         Self {
-            gltf: gltf,
+            document: document,
             json: json,
         }
-    }
-
-    /// Returns the internal JSON item.
-    #[doc(hidden)]
-    pub fn as_json(&self) -> &json::camera::Perspective {
-        self.json
     }
 
     ///  Aspect ratio of the field of view.

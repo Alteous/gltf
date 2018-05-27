@@ -22,6 +22,12 @@ This crate is intended to load [glTF 2.0](https://www.khronos.org/gltf), a file 
 
 `rustc` version 1.19 or above is required.
 
+### Reference infographic
+
+![infographic](https://github.com/KhronosGroup/glTF/blob/master/specification/2.0/figures/gltfOverview-2.0.0a.png)
+
+<p align="center">From <a href="github.com/javagl/gltfOverview">javagl/gltfOverview.</a></p>
+
 ### Usage
 
 See the [crate documentation](https://docs.rs/gltf) for example usage.

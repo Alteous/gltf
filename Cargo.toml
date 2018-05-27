@@ -1,6 +1,6 @@
 [package]
 name = "gltf"
-version = "0.10.1"
+version = "0.11.0"
 authors = ["David Harvey-Macaulay <alteous@outlook.com>"]
 description = "glTF 2.0 loader"
 documentation = "https://docs.rs/gltf"
@@ -21,21 +21,25 @@ include = [
 travis-ci = { repository = "gltf-rs/gltf" }
 
 [workspace]
-members = ["gltf-derive", "gltf-json", "gltf-importer", "gltf-utils"]
+members = ["gltf-derive", "gltf-json"]
 
 [dev-dependencies]
 approx = "0.1.1"
 
 [dependencies]
+base64 = { optional = true, version = "0.6" }
 byteorder = "1.1"
 cgmath = "0.15"
-gltf-json = { path = "gltf-json", version = "0.10.1" }
+gltf-json = { path = "gltf-json", version = "0.11.0" }
+image = { optional = true, version = "0.19" }
 lazy_static = "0.2"
 
 [features]
-default = []
+default = ["import", "utils", "names"]
 extras = ["gltf-json/extras"]
 names = ["gltf-json/names"]
+utils = []
+import = ["base64", "image"]
 
 [[example]]
 name = "gltf-display"
@@ -44,4 +48,3 @@ path = "examples/display/main.rs"
 [[example]]
 name = "gltf-tree"
 path = "examples/tree/main.rs"
-required-features = ["names"]

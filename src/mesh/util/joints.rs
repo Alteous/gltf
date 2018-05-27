@@ -1,10 +1,10 @@
 use std::marker::PhantomData;
 
-use Joints;
+use mesh::util::ReadJoints;
 
 /// Casting iterator for `Joints`.
 #[derive(Clone, Debug)]
-pub struct CastingIter<'a, T>(Joints<'a>, PhantomData<T>);
+pub struct CastingIter<'a, T>(ReadJoints<'a>, PhantomData<T>);
 
 /// Type which describes how to cast any joint into u16.
 #[derive(Clone, Debug)]
@@ -23,39 +23,40 @@ pub trait Cast {
 }
 
 impl<'a, A> CastingIter<'a, A> {
-    pub(crate) fn new(iter: Joints<'a>) -> Self {
+    pub(crate) fn new(iter: ReadJoints<'a>) -> Self {
         CastingIter(iter, PhantomData)
     }
 
     /// Unwrap underlying `Joints` object.
-    pub fn unwrap(self) -> Joints<'a> {
+    pub fn unwrap(self) -> ReadJoints<'a> {
         self.0
     }
 }
 
+impl<'a, A: Cast> ExactSizeIterator for CastingIter<'a, A> {}
 impl<'a, A: Cast> Iterator for CastingIter<'a, A> {
     type Item = A::Output;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         match self.0 {
-            Joints::U8(ref mut i)  => i.next().map(A::cast_u8),
-            Joints::U16(ref mut i) => i.next().map(A::cast_u16),
+            ReadJoints::U8(ref mut i)  => i.next().map(A::cast_u8),
+            ReadJoints::U16(ref mut i) => i.next().map(A::cast_u16),
         }
     }
 
     #[inline]
     fn nth(&mut self, x: usize) -> Option<Self::Item> {
         match self.0 {
-            Joints::U8(ref mut i)  => i.nth(x).map(A::cast_u8),
-            Joints::U16(ref mut i) => i.nth(x).map(A::cast_u16),
+            ReadJoints::U8(ref mut i)  => i.nth(x).map(A::cast_u8),
+            ReadJoints::U16(ref mut i) => i.nth(x).map(A::cast_u16),
         }
     }
 
     fn last(self) -> Option<Self::Item> {
         match self.0 {
-            Joints::U8(i)  => i.last().map(A::cast_u8),
-            Joints::U16(i) => i.last().map(A::cast_u16),
+            ReadJoints::U8(i)  => i.last().map(A::cast_u8),
+            ReadJoints::U16(i) => i.last().map(A::cast_u16),
         }
     }
 
@@ -66,8 +67,8 @@ impl<'a, A: Cast> Iterator for CastingIter<'a, A> {
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
         match self.0 {
-            Joints::U8(ref i)  => i.size_hint(),
-            Joints::U16(ref i) => i.size_hint(),
+            ReadJoints::U8(ref i)  => i.size_hint(),
+            ReadJoints::U16(ref i) => i.size_hint(),
         }
     }
 }

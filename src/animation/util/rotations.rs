@@ -1,8 +1,6 @@
+use animation::util::Rotations;
 use std::marker::PhantomData;
-
-use super::Normalize;
-
-use Rotations;
+use Normalize;
 
 /// Casting iterator for `Rotations`.
 #[derive(Clone, Debug)]
@@ -60,6 +58,7 @@ impl<'a, A> CastingIter<'a, A> {
     }
 }
 
+impl<'a, A: Cast> ExactSizeIterator for CastingIter<'a, A> {}
 impl<'a, A: Cast> Iterator for CastingIter<'a, A> {
     type Item = A::Output;
 

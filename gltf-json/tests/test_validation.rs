@@ -7,7 +7,7 @@ use gltf_json::Path;
 fn import_json(filename: &str) -> gltf_json::Root {
     let file = fs::File::open(filename).unwrap();
     let reader = io::BufReader::new(file);
-    gltf_json::from_reader(reader).unwrap()
+    gltf_json::Root::from_reader(reader).unwrap()
 }
 
 #[test]

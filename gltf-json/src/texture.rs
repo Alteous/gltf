@@ -1,4 +1,4 @@
-use serde::de;
+use serde::{de, ser};
 use std::fmt;
 use validation::Checked;
 use {extensions, image, Extras, Index};
@@ -54,7 +54,7 @@ pub const VALID_WRAPPING_MODES: &'static [u32] = &[
 ];
 
 /// Magnification filter.
-#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize)]
 pub enum MagFilter {
     /// Corresponds to `GL_NEAREST`.
     Nearest = 1,
@@ -65,16 +65,16 @@ pub enum MagFilter {
 
 impl MagFilter {
     /// OpenGL enum
-    pub fn as_gl_enum(&self) -> i32 {
+    pub fn as_gl_enum(&self) -> u32 {
         match *self {
-            MagFilter::Nearest => NEAREST as i32,
-            MagFilter::Linear => LINEAR as i32,
+            MagFilter::Nearest => NEAREST,
+            MagFilter::Linear => LINEAR,
         }
     }
 }
 
 /// Minification filter.
-#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize)]
 pub enum MinFilter {
     /// Corresponds to `GL_NEAREST`.
     Nearest = 1,
@@ -97,20 +97,20 @@ pub enum MinFilter {
 
 impl MinFilter {
     /// Returns the corresponding OpenGL enum value.
-    pub fn as_gl_enum(&self) -> i32 {
+    pub fn as_gl_enum(&self) -> u32 {
         match *self {
-            MinFilter::Nearest => NEAREST as i32,
-            MinFilter::Linear => LINEAR as i32,
-            MinFilter::NearestMipmapNearest => NEAREST_MIPMAP_NEAREST as i32,
-            MinFilter::LinearMipmapNearest => LINEAR_MIPMAP_NEAREST as i32,
-            MinFilter::NearestMipmapLinear => NEAREST_MIPMAP_LINEAR as i32,
-            MinFilter::LinearMipmapLinear => LINEAR_MIPMAP_LINEAR as i32,
+            MinFilter::Nearest => NEAREST,
+            MinFilter::Linear => LINEAR,
+            MinFilter::NearestMipmapNearest => NEAREST_MIPMAP_NEAREST,
+            MinFilter::LinearMipmapNearest => LINEAR_MIPMAP_NEAREST,
+            MinFilter::NearestMipmapLinear => NEAREST_MIPMAP_LINEAR,
+            MinFilter::LinearMipmapLinear => LINEAR_MIPMAP_LINEAR,
         }
     }
 }
 
 /// Texture co-ordinate wrapping mode.
-#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize)]
 pub enum WrappingMode {
     /// Corresponds to `GL_CLAMP_TO_EDGE`.
     ClampToEdge = 1,
@@ -124,11 +124,11 @@ pub enum WrappingMode {
 
 impl WrappingMode {
     /// Returns the corresponding OpenGL enum value.
-    pub fn as_gl_enum(&self) -> i32 {
+    pub fn as_gl_enum(&self) -> u32 {
         match *self {
-            WrappingMode::ClampToEdge => CLAMP_TO_EDGE as i32,
-            WrappingMode::MirroredRepeat => MIRRORED_REPEAT as i32,
-            WrappingMode::Repeat => REPEAT as i32,
+            WrappingMode::ClampToEdge => CLAMP_TO_EDGE,
+            WrappingMode::MirroredRepeat => MIRRORED_REPEAT,
+            WrappingMode::Repeat => REPEAT,
         }
     }
 }
@@ -267,6 +267,15 @@ impl<'de> de::Deserialize<'de> for Checked<MinFilter> {
     }
 }
 
+impl ser::Serialize for MinFilter {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: ser::Serializer,
+    {
+        serializer.serialize_u32(self.as_gl_enum())
+    }
+}
+
 impl<'de> de::Deserialize<'de> for Checked<WrappingMode> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
         where D: de::Deserializer<'de>
@@ -296,8 +305,26 @@ impl<'de> de::Deserialize<'de> for Checked<WrappingMode> {
     }
 }
 
+impl ser::Serialize for MagFilter {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: ser::Serializer,
+    {
+        serializer.serialize_u32(self.as_gl_enum())
+    }
+}
+
 impl Default for WrappingMode {
     fn default() -> Self {
         WrappingMode::Repeat
+    }
+}
+
+impl ser::Serialize for WrappingMode {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: ser::Serializer,
+    {
+        serializer.serialize_u32(self.as_gl_enum())
     }
 }

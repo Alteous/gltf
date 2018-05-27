@@ -1,12 +1,14 @@
 use buffer;
 use extensions;
 use serde;
-use std::{self, fmt, marker};
+use serde_json;
+use std::{self, fmt, io, marker};
 use texture;
+use validation;
 
 use path::Path;
-use validation::{Error, Validate};
-use {Accessor, Animation, Asset, Buffer, Camera, Extras, Image, Material, Mesh, Node, Scene, Skin, Texture};
+use validation::Validate;
+use {Accessor, Animation, Asset, Buffer, Camera, Error, Extras, Image, Material, Mesh, Node, Scene, Skin, Texture, Value};
 
 /// Helper trait for retrieving top-level objects by a universal identifier.
 pub trait Get<T> {
@@ -103,6 +105,62 @@ impl Root {
     {
         (self as &Get<T>).get(index)
     }
+
+    /// Deserialize from a JSON string slice.
+    pub fn from_str(str_: &str) -> Result<Self, Error> {
+        serde_json::from_str(str_)
+    }
+
+    /// Deserialize from a JSON byte slice.
+    pub fn from_slice(slice: &[u8]) -> Result<Self, Error> {
+        serde_json::from_slice(slice)
+    }
+
+    /// Deserialize from a stream of JSON.
+    pub fn from_reader<R>(reader: R) -> Result<Self, Error>
+        where R: io::Read
+    {
+        serde_json::from_reader(reader)
+    }
+
+    /// Serialize as a `String` of JSON.
+    pub fn to_string(&self) -> Result<String, Error> {
+        serde_json::to_string(self)
+    }
+
+    /// Serialize as a pretty-printed `String` of JSON.
+    pub fn to_string_pretty(&self) -> Result<String, Error> {
+        serde_json::to_string_pretty(self)
+    }
+
+    /// Serialize as a generic JSON value.
+    pub fn to_value(&self) -> Result<Value, Error> {
+        serde_json::to_value(self)
+    }
+
+    /// Serialize as a JSON byte vector.
+    pub fn to_vec(&self) -> Result<Vec<u8>, Error> {
+        serde_json::to_vec(self)
+    }
+
+    /// Serialize as a pretty-printed JSON byte vector.
+    pub fn to_vec_pretty(&self) -> Result<Vec<u8>, Error> {
+        serde_json::to_vec_pretty(self)
+    }
+
+    /// Serialize as a JSON byte writertor.
+    pub fn to_writer<W>(&self, writer: W) -> Result<(), Error>
+        where W: io::Write,
+    {
+        serde_json::to_writer(writer, self)
+    }
+
+    /// Serialize as a pretty-printed JSON byte writertor.
+    pub fn to_writer_pretty<W>(&self, writer: W) -> Result<(), Error>
+        where W: io::Write,
+    {
+        serde_json::to_writer_pretty(writer, self)
+    }
 }
 
 impl<T> Index<T> {
@@ -163,10 +221,10 @@ impl<T: Validate> Validate for Index<T>
     where Root: Get<T>
 {
     fn validate_minimally<P, R>(&self, root: &Root, path: P, report: &mut R)
-        where P: Fn() -> Path, R: FnMut(&Fn() -> Path, Error)
+        where P: Fn() -> Path, R: FnMut(&Fn() -> Path, validation::Error)
     {
         if root.get(self).is_none() {
-            report(&path, Error::IndexOutOfBounds);
+            report(&path, validation::Error::IndexOutOfBounds);
         }
     }
 }

@@ -1,4 +1,4 @@
-use {json, texture, Gltf};
+use {json, texture, Document};
 
 pub use json::material::AlphaMode;
 
@@ -8,8 +8,8 @@ lazy_static! {
 
 /// The material appearance of a primitive.
 pub struct Material<'a> {
-    /// The parent `Gltf` struct.
-    gltf: &'a Gltf,
+    /// The parent `Document` struct.
+    document: &'a Document,
 
     /// The corresponding JSON index - `None` when the default material.
     index: Option<usize>,
@@ -21,21 +21,21 @@ pub struct Material<'a> {
 impl<'a> Material<'a> {
     /// Constructs a `Material`.
     pub(crate) fn new(
-        gltf: &'a Gltf,
+        document: &'a Document,
         index: usize,
         json: &'a json::material::Material,
     ) -> Self {
         Self {
-            gltf: gltf,
+            document: document,
             index: Some(index),
             json: json,
         }
     }
 
     /// Constructs the default `Material`.
-    pub(crate) fn default(gltf: &'a Gltf) -> Self {
+    pub(crate) fn default(document: &'a Document) -> Self {
         Self {
-            gltf: gltf,
+            document: document,
             index: None,
             json: &DEFAULT_MATERIAL,
         }
@@ -46,12 +46,6 @@ impl<'a> Material<'a> {
     /// This function returns `None` if the `Material` is the default material.
     pub fn index(&self) -> Option<usize> {
         self.index
-    }
-
-    /// Returns the internal JSON item.
-    #[doc(hidden)]
-    pub fn as_json(&self) ->  &json::material::Material {
-        self.json
     }
 
     ///  The alpha cutoff value of the material.
@@ -95,7 +89,7 @@ impl<'a> Material<'a> {
     /// Parameter values that define the metallic-roughness material model from
     /// Physically-Based Rendering (PBR) methodology.
     pub fn pbr_metallic_roughness(&self) -> PbrMetallicRoughness<'a> {
-        PbrMetallicRoughness::new(self.gltf, &self.json.pbr_metallic_roughness)
+        PbrMetallicRoughness::new(self.document, &self.json.pbr_metallic_roughness)
     }
 
     /// A tangent space normal map.
@@ -111,7 +105,7 @@ impl<'a> Material<'a> {
     /// +Z points toward the viewer.
     pub fn normal_texture(&self) -> Option<NormalTexture<'a>> {
         self.json.normal_texture.as_ref().map(|json| {
-            let texture = self.gltf.textures().nth(json.index.value()).unwrap();
+            let texture = self.document.textures().nth(json.index.value()).unwrap();
             NormalTexture::new(texture, json)
         })
     }
@@ -126,7 +120,7 @@ impl<'a> Material<'a> {
     /// calculations.
     pub fn occlusion_texture(&self) -> Option<OcclusionTexture<'a>> {
         self.json.occlusion_texture.as_ref().map(|json| {
-            let texture = self.gltf.textures().nth(json.index.value()).unwrap();
+            let texture = self.document.textures().nth(json.index.value()).unwrap();
             OcclusionTexture::new(texture, json)
         })
     }
@@ -140,7 +134,7 @@ impl<'a> Material<'a> {
     /// component (A) is present, it is ignored.
     pub fn emissive_texture(&self) -> Option<texture::Info<'a>> {
         self.json.emissive_texture.as_ref().map(|json| {
-            let texture = self.gltf.textures().nth(json.index.value()).unwrap();
+            let texture = self.document.textures().nth(json.index.value()).unwrap();
             texture::Info::new(texture, json)
         })
     }
@@ -161,8 +155,8 @@ impl<'a> Material<'a> {
 /// A set of parameter values that are used to define the metallic-roughness
 /// material model from Physically-Based Rendering (PBR) methodology.
 pub struct PbrMetallicRoughness<'a> {
-    /// The parent `Gltf` struct.
-    gltf: &'a Gltf,
+    /// The parent `Document` struct.
+    document: &'a Document,
 
     /// The corresponding JSON struct.
     json: &'a json::material::PbrMetallicRoughness,
@@ -171,19 +165,13 @@ pub struct PbrMetallicRoughness<'a> {
 impl<'a> PbrMetallicRoughness<'a> {
     /// Constructs `PbrMetallicRoughness`.
     pub(crate) fn new(
-        gltf: &'a Gltf,
+        document: &'a Document,
         json: &'a json::material::PbrMetallicRoughness,
     ) -> Self {
         Self {
-            gltf: gltf,
+            document: document,
             json: json,
         }
-    }
-
-    /// Returns the internal JSON item.
-    #[doc(hidden)]
-    pub fn as_json(&self) -> &json::material::PbrMetallicRoughness {
-        self.json
     }
 
     /// Returns the material's base color factor.
@@ -196,7 +184,7 @@ impl<'a> PbrMetallicRoughness<'a> {
     /// Returns the base color texture.
     pub fn base_color_texture(&self) -> Option<texture::Info<'a>> {
         self.json.base_color_texture.as_ref().map(|json| {
-            let texture = self.gltf.textures().nth(json.index.value()).unwrap();
+            let texture = self.document.textures().nth(json.index.value()).unwrap();
             texture::Info::new(texture, json)
         })
     }
@@ -226,7 +214,7 @@ impl<'a> PbrMetallicRoughness<'a> {
     /// they are ignored for metallic-roughness calculations.
     pub fn metallic_roughness_texture(&self) -> Option<texture::Info<'a>> {
         self.json.metallic_roughness_texture.as_ref().map(|json| {
-            let texture = self.gltf.textures().nth(json.index.value()).unwrap();
+            let texture = self.document.textures().nth(json.index.value()).unwrap();
             texture::Info::new(texture, json)
         })
     }
@@ -256,12 +244,6 @@ impl<'a> NormalTexture<'a> {
             texture: texture,
             json: json,
         }
-    }
-
-    /// Returns the internal JSON item.
-    #[doc(hidden)]
-    pub fn as_json(&self) ->  &json::material::NormalTexture {
-        self.json
     }
 
     /// Returns the scalar multiplier applied to each normal vector of the texture.
@@ -306,12 +288,6 @@ impl<'a> OcclusionTexture<'a> {
             texture: texture,
             json: json,
         }
-    }
-
-    /// Returns the internal JSON item.
-    #[doc(hidden)]
-    pub fn as_json(&self) ->  &json::material::OcclusionTexture {
-        self.json
     }
 
     /// Returns the scalar multiplier controlling the amount of occlusion applied.

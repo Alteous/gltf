@@ -19,17 +19,6 @@ pub enum Type {
     Orthographic,
 }
 
-impl ser::Serialize for Type {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where S: ser::Serializer
-    {
-        match *self {
-            Type::Perspective => serializer.serialize_str("perspective"),
-            Type::Orthographic => serializer.serialize_str("orthographic"),
-        }
-    }
-}
-
 /// A camera's projection.
 ///
 /// A node can reference a camera to apply a transform to place the camera in the
@@ -206,5 +195,16 @@ impl<'de> de::Deserialize<'de> for Checked<Type> {
             }
         }
         deserializer.deserialize_str(Visitor)
+    }
+}
+
+impl ser::Serialize for Type {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where S: ser::Serializer
+    {
+        match *self {
+            Type::Perspective => serializer.serialize_str("perspective"),
+            Type::Orthographic => serializer.serialize_str("orthographic"),
+        }
     }
 }

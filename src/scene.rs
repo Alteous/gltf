@@ -1,21 +1,13 @@
 use cgmath;
 use cgmath::prelude::*;
 use json;
-use std::{mem, slice};
+use std::slice;
 
-use {Camera, Gltf, Mesh, Skin};
+use {Camera, Document, Mesh, Skin};
 
 type Matrix3 = cgmath::Matrix3<f32>;
 type Matrix4 = cgmath::Matrix4<f32>;
 type Quaternion = cgmath::Quaternion<f32>;
-
-/// 4x4 identity matrix.
-const IDENTITY: [f32; 16] = {
-    [1.0, 0.0, 0.0, 0.0,
-     0.0, 1.0, 0.0, 0.0,
-     0.0, 0.0, 1.0, 0.0,
-     0.0, 0.0, 0.0, 1.0]
-};
 
 /// The transform for a `Node`.
 #[derive(Clone, Debug)]
@@ -93,8 +85,8 @@ impl Transform {
 /// attributes.
 #[derive(Clone, Debug)]
 pub struct Node<'a> {
-    /// The parent `Gltf` struct.
-    gltf: &'a Gltf,
+    /// The parent `Document` struct.
+    document: &'a Document,
 
     /// The corresponding JSON index.
     index: usize,
@@ -103,12 +95,12 @@ pub struct Node<'a> {
     json: &'a json::scene::Node,
 }
 
-/// The root `Node`s of a scene.
+/// The root nodes of a scene.
 #[derive(Clone, Debug)]
 pub struct Scene<'a> {
-    /// The parent `Gltf` struct.
+    /// The parent `Document` struct.
     #[allow(dead_code)]
-    gltf: &'a Gltf,
+    document: &'a Document,
 
     /// The corresponding JSON index.
     index: usize,
@@ -120,8 +112,8 @@ pub struct Scene<'a> {
 /// An `Iterator` that visits the nodes in a scene.
 #[derive(Clone, Debug)]
 pub struct Nodes<'a> {
-    /// The parent `Gltf` struct.
-    gltf: &'a Gltf,
+    /// The parent `Document` struct.
+    document: &'a Document,
 
     /// The internal node index iterator.
     iter: slice::Iter<'a, json::Index<json::scene::Node>>,
@@ -130,8 +122,8 @@ pub struct Nodes<'a> {
 /// An `Iterator` that visits the children of a node.
 #[derive(Clone, Debug)]
 pub struct Children<'a> {
-    /// The parent `Gltf` struct.
-    gltf: &'a Gltf,
+    /// The parent `Document` struct.
+    document: &'a Document,
 
     /// The internal node index iterator.
     iter: slice::Iter<'a, json::Index<json::scene::Node>>,
@@ -140,12 +132,12 @@ pub struct Children<'a> {
 impl<'a> Node<'a> {
     /// Constructs a `Node`.
     pub(crate) fn new(
-        gltf: &'a Gltf,
+        document: &'a Document,
         index: usize,
         json: &'a json::scene::Node,
     ) -> Self {
         Self {
-            gltf: gltf,
+            document: document,
             index: index,
             json: json,
         }
@@ -156,23 +148,17 @@ impl<'a> Node<'a> {
         self.index
     }
 
-    /// Returns the internal JSON item.
-    #[doc(hidden)]
-    pub fn as_json(&self) ->  &json::scene::Node {
-        self.json
-    }
-
     /// Returns the camera referenced by this node.
     pub fn camera(&self) -> Option<Camera> {
         self.json.camera.as_ref().map(|index| {
-            self.gltf.cameras().nth(index.value()).unwrap()
+            self.document.cameras().nth(index.value()).unwrap()
         })
     }
 
     /// Returns an `Iterator` that visits the node's children.
     pub fn children(&self) -> Children {
         Children {
-            gltf: self.gltf,
+            document: self.document,
             iter: self.json.children.as_ref().map_or([].iter(), |x| x.iter()),
         }
     }
@@ -182,16 +168,10 @@ impl<'a> Node<'a> {
         &self.json.extras
     }
 
-    /// Returns the 4x4 column-major transformation matrix.
-    #[deprecated(since = "0.9.1", note = "Use `transform().matrix()` instead")]
-    pub fn matrix(&self) -> [f32; 16] {
-        self.json.matrix.unwrap_or(IDENTITY)
-    }
-
     /// Returns the mesh referenced by this node.
     pub fn mesh(&self) -> Option<Mesh> {
         self.json.mesh.as_ref().map(|index| {
-            self.gltf.meshes().nth(index.value()).unwrap()
+            self.document.meshes().nth(index.value()).unwrap()
         })
     }
 
@@ -201,32 +181,16 @@ impl<'a> Node<'a> {
         self.json.name.as_ref().map(String::as_str)
     }
 
-    /// Returns the node's unit quaternion rotation in the order `[x, y, z, w]`,
-    /// where `w` is the scalar.
-    #[deprecated(since = "0.9.1", note = "Use `transform().decomposed()` instead.")]
-    pub fn rotation(&self) -> [f32; 4] {
-        self.json.rotation.0
-    }
-
-    /// Returns the node's non-uniform scale.
-    #[deprecated(since = "0.9.1", note = "Use `transform().decomposed()` instead.")]
-    pub fn scale(&self) -> [f32; 3] {
-        self.json.scale
-    }
-
-    /// Returns the node's translation.
-    #[deprecated(since = "0.9.1", note = "Use `transform().decomposed()` instead.")]
-    pub fn translation(&self) -> [f32; 3] {
-        self.json.translation
-    }
-
     /// Returns the node's transform.
     pub fn transform(&self) -> Transform {
-        if let Some(matrix) = self.json.matrix {
-            unsafe {
-                Transform::Matrix {
-                    matrix: mem::transmute(matrix),
-                }
+        if let Some(m) = self.json.matrix {
+            Transform::Matrix {
+                matrix: [
+                    [m[0], m[1], m[2], m[3]],
+                    [m[4], m[5], m[6], m[7]],
+                    [m[8], m[9], m[10], m[11]],
+                    [m[12], m[13], m[14], m[15]],
+                ],
             }
         } else {
             Transform::Decomposed {
@@ -240,7 +204,7 @@ impl<'a> Node<'a> {
     /// Returns the skin referenced by this node.
     pub fn skin(&self) -> Option<Skin> {
         self.json.skin.as_ref().map(|index| {
-            self.gltf.skins().nth(index.value()).unwrap()
+            self.document.skins().nth(index.value()).unwrap()
         })
     }
 
@@ -253,12 +217,12 @@ impl<'a> Node<'a> {
 impl<'a> Scene<'a> {
     /// Constructs a `Scene`.
     pub(crate) fn new(
-        gltf: &'a Gltf,
+        document: &'a Document,
         index: usize,
         json: &'a json::scene::Scene,
     ) -> Self {
         Self {
-            gltf: gltf,
+            document: document,
             index: index,
             json: json,
         }
@@ -267,12 +231,6 @@ impl<'a> Scene<'a> {
     /// Returns the internal JSON index.
     pub fn index(&self) -> usize {
         self.index
-    }
-
-    /// Returns the internal JSON item.
-    #[doc(hidden)]
-    pub fn as_json(&self) ->  &json::scene::Scene {
-        self.json
     }
 
     /// Optional application specific data.
@@ -289,7 +247,7 @@ impl<'a> Scene<'a> {
     /// Returns an `Iterator` that visits each root node of the scene.
     pub fn nodes(&self) -> Nodes<'a> {
         Nodes {
-            gltf: self.gltf,
+            document: self.document,
             iter: self.json.nodes.iter(),
         }
     }
@@ -301,7 +259,7 @@ impl<'a> Iterator for Nodes<'a> {
     fn next(&mut self) -> Option<Self::Item> {
         self.iter
             .next()
-            .map(|index| self.gltf.nodes().nth(index.value()).unwrap())
+            .map(|index| self.document.nodes().nth(index.value()).unwrap())
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
@@ -315,7 +273,7 @@ impl<'a> Iterator for Children<'a> {
     fn next(&mut self) -> Option<Self::Item> {
         self.iter
             .next()
-            .map(|index| self.gltf.nodes().nth(index.value()).unwrap())
+            .map(|index| self.document.nodes().nth(index.value()).unwrap())
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {

@@ -6,6 +6,51 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
 The `gltf` crate adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [0.11.0] - 2018-05-27
+
+### Added
+
+- `payload` field in `Gltf` in order to handle binary glTF directly.
+- `Error::Io` enum variant.
+- `Gltf::from_reader_without_validation` and `Gltf::from_slice_without_validation`.
+- All functionality from the `gltf-utils` crate, feature gated with the new
+  `utils` feature.
+- Most functionality from the `gltf-importer` crate, feature gated with the
+  new `import` feature.
+- `enum Uri` to represent uniform resource locators.
+
+### Changed
+
+- `fn Gltf::from_*` now imports binary glTF as well as standard glTF.
+- `fn Gltf::from_reader` now requires `reader` to implement `std::io::Seek`.
+- `Buffer::uri` now returns `None` in the case of binary glTF payload instead
+	of the magic string `"#bin"`.
+- The `POSITION` attribute is now required by all mesh primitives.
+- Several renames:
+	- `glb` → `binary`.
+	- `Error::Glb` → `Error::Binary`.
+	- `TrsProperty` → `Property`.
+	- `InterpolationAlgorithm` → `Interpolation`.
+	- `Target::path` → `Target::property`.
+	- `Primitive::position_bounds` → `Primitive::bounding_box`.
+- The `names` feature is now enabled by default, along with `utils` and
+  `import`. Rationale: Pareto principle.
+
+### Fixed
+
+- Data structures in `gltf_json` now implement `Serialize`.
+
+### Removed
+
+- `fn Gltf::from_str` -- use `fn Gltf::from_slice` instead.
+- `fn Gltf::from_value` -- no longer supported.
+- `fn gltf::is_binary` -- use `slice.starts_with("glTF")` instead.
+- `struct Unvalidated` -- replaced with `enum Validation`.
+- `crate gltf-importer` -- no longer supported.
+- `Node::matrix` -- use `transform().matrix()` instead.
+- `Node::rotation` -- use `transform().decomposed()` instead.
+- All hidden `as_json` functions -- no longer supported.
+
 ## [0.10.1] - 2018-03-05
 
 ### Fixed
@@ -16,7 +61,7 @@ The `gltf` crate adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Added
 
-- `ChannelIterators`
+- `ChannelIterators`.
 
 ### Changed
 

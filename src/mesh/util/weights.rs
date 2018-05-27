@@ -1,12 +1,12 @@
 use std::marker::PhantomData;
 
-use super::Normalize;
+use Normalize;
 
-use Weights;
+use mesh::util::ReadWeights;
 
 /// Casting iterator for `Weights`.
 #[derive(Clone, Debug)]
-pub struct CastingIter<'a, T>(Weights<'a>, PhantomData<T>);
+pub struct CastingIter<'a, T>(ReadWeights<'a>, PhantomData<T>);
 
 /// Type which describes how to cast any weight into u8.
 #[derive(Clone, Debug)]
@@ -36,42 +36,43 @@ pub trait Cast {
 }
 
 impl<'a, A> CastingIter<'a, A> {
-    pub(crate) fn new(iter: Weights<'a>) -> Self {
+    pub(crate) fn new(iter: ReadWeights<'a>) -> Self {
         CastingIter(iter, PhantomData)
     }
 
     /// Unwrap underlying `Weights` object.
-    pub fn unwrap(self) -> Weights<'a> {
+    pub fn unwrap(self) -> ReadWeights<'a> {
         self.0
     }
 }
 
+impl<'a, A: Cast> ExactSizeIterator for CastingIter<'a, A> {}
 impl<'a, A: Cast> Iterator for CastingIter<'a, A> {
     type Item = A::Output;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         match self.0 {
-            Weights::U8(ref mut i)  => i.next().map(A::cast_u8),
-            Weights::U16(ref mut i) => i.next().map(A::cast_u16),
-            Weights::F32(ref mut i) => i.next().map(A::cast_f32),
+            ReadWeights::U8(ref mut i)  => i.next().map(A::cast_u8),
+            ReadWeights::U16(ref mut i) => i.next().map(A::cast_u16),
+            ReadWeights::F32(ref mut i) => i.next().map(A::cast_f32),
         }
     }
 
     #[inline]
     fn nth(&mut self, x: usize) -> Option<Self::Item> {
         match self.0 {
-            Weights::U8(ref mut i)  => i.nth(x).map(A::cast_u8),
-            Weights::U16(ref mut i) => i.nth(x).map(A::cast_u16),
-            Weights::F32(ref mut i) => i.nth(x).map(A::cast_f32),
+            ReadWeights::U8(ref mut i)  => i.nth(x).map(A::cast_u8),
+            ReadWeights::U16(ref mut i) => i.nth(x).map(A::cast_u16),
+            ReadWeights::F32(ref mut i) => i.nth(x).map(A::cast_f32),
         }
     }
 
     fn last(self) -> Option<Self::Item> {
         match self.0 {
-            Weights::U8(i)  => i.last().map(A::cast_u8),
-            Weights::U16(i) => i.last().map(A::cast_u16),
-            Weights::F32(i) => i.last().map(A::cast_f32),
+            ReadWeights::U8(i)  => i.last().map(A::cast_u8),
+            ReadWeights::U16(i) => i.last().map(A::cast_u16),
+            ReadWeights::F32(i) => i.last().map(A::cast_f32),
         }
     }
 
@@ -82,9 +83,9 @@ impl<'a, A: Cast> Iterator for CastingIter<'a, A> {
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
         match self.0 {
-            Weights::U8(ref i)  => i.size_hint(),
-            Weights::U16(ref i) => i.size_hint(),
-            Weights::F32(ref i) => i.size_hint(),
+            ReadWeights::U8(ref i)  => i.size_hint(),
+            ReadWeights::U16(ref i) => i.size_hint(),
+            ReadWeights::F32(ref i) => i.size_hint(),
         }
     }
 }

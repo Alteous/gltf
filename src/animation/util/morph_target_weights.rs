@@ -1,12 +1,10 @@
+use animation::util::MorphTargetWeights;
 use std::marker::PhantomData;
+use Normalize;
 
-use super::Normalize;
-
-use MorphWeights;
-
-/// Casting iterator for `MorphWeights`.
+/// Casting iterator for `MorphTargetWeights`.
 #[derive(Clone, Debug)]
-pub struct CastingIter<'a, T>(MorphWeights<'a>, PhantomData<T>);
+pub struct CastingIter<'a, T>(MorphTargetWeights<'a>, PhantomData<T>);
 
 /// Type which describes how to cast any weight into i8.
 #[derive(Clone, Debug)]
@@ -50,48 +48,49 @@ pub trait Cast {
 }
 
 impl<'a, A> CastingIter<'a, A> {
-    pub(crate) fn new(iter: MorphWeights<'a>) -> Self {
+    pub(crate) fn new(iter: MorphTargetWeights<'a>) -> Self {
         CastingIter(iter, PhantomData)
     }
 
-    /// Unwrap underlying `MorphWeights` object.
-    pub fn unwrap(self) -> MorphWeights<'a> {
+    /// Unwrap underlying `MorphTargetWeights` object.
+    pub fn unwrap(self) -> MorphTargetWeights<'a> {
         self.0
     }
 }
 
+impl<'a, A: Cast> ExactSizeIterator for CastingIter<'a, A> {}
 impl<'a, A: Cast> Iterator for CastingIter<'a, A> {
     type Item = A::Output;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         match self.0 {
-            MorphWeights::I8(ref mut i)  => i.next().map(A::cast_i8),
-            MorphWeights::U8(ref mut i)  => i.next().map(A::cast_u8),
-            MorphWeights::I16(ref mut i) => i.next().map(A::cast_i16),
-            MorphWeights::U16(ref mut i) => i.next().map(A::cast_u16),
-            MorphWeights::F32(ref mut i) => i.next().map(A::cast_f32),
+            MorphTargetWeights::I8(ref mut i)  => i.next().map(A::cast_i8),
+            MorphTargetWeights::U8(ref mut i)  => i.next().map(A::cast_u8),
+            MorphTargetWeights::I16(ref mut i) => i.next().map(A::cast_i16),
+            MorphTargetWeights::U16(ref mut i) => i.next().map(A::cast_u16),
+            MorphTargetWeights::F32(ref mut i) => i.next().map(A::cast_f32),
         }
     }
 
     #[inline]
     fn nth(&mut self, x: usize) -> Option<Self::Item> {
         match self.0 {
-            MorphWeights::I8(ref mut i)  => i.nth(x).map(A::cast_i8),
-            MorphWeights::U8(ref mut i)  => i.nth(x).map(A::cast_u8),
-            MorphWeights::I16(ref mut i) => i.nth(x).map(A::cast_i16),
-            MorphWeights::U16(ref mut i) => i.nth(x).map(A::cast_u16),
-            MorphWeights::F32(ref mut i) => i.nth(x).map(A::cast_f32),
+            MorphTargetWeights::I8(ref mut i)  => i.nth(x).map(A::cast_i8),
+            MorphTargetWeights::U8(ref mut i)  => i.nth(x).map(A::cast_u8),
+            MorphTargetWeights::I16(ref mut i) => i.nth(x).map(A::cast_i16),
+            MorphTargetWeights::U16(ref mut i) => i.nth(x).map(A::cast_u16),
+            MorphTargetWeights::F32(ref mut i) => i.nth(x).map(A::cast_f32),
         }
     }
 
     fn last(self) -> Option<Self::Item> {
         match self.0 {
-            MorphWeights::I8(i)  => i.last().map(A::cast_i8),
-            MorphWeights::U8(i)  => i.last().map(A::cast_u8),
-            MorphWeights::I16(i) => i.last().map(A::cast_i16),
-            MorphWeights::U16(i) => i.last().map(A::cast_u16),
-            MorphWeights::F32(i) => i.last().map(A::cast_f32),
+            MorphTargetWeights::I8(i)  => i.last().map(A::cast_i8),
+            MorphTargetWeights::U8(i)  => i.last().map(A::cast_u8),
+            MorphTargetWeights::I16(i) => i.last().map(A::cast_i16),
+            MorphTargetWeights::U16(i) => i.last().map(A::cast_u16),
+            MorphTargetWeights::F32(i) => i.last().map(A::cast_f32),
         }
     }
 
@@ -102,11 +101,11 @@ impl<'a, A: Cast> Iterator for CastingIter<'a, A> {
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
         match self.0 {
-            MorphWeights::I8(ref i)  => i.size_hint(),
-            MorphWeights::U8(ref i)  => i.size_hint(),
-            MorphWeights::I16(ref i) => i.size_hint(),
-            MorphWeights::U16(ref i) => i.size_hint(),
-            MorphWeights::F32(ref i) => i.size_hint(),
+            MorphTargetWeights::I8(ref i)  => i.size_hint(),
+            MorphTargetWeights::U8(ref i)  => i.size_hint(),
+            MorphTargetWeights::I16(ref i) => i.size_hint(),
+            MorphTargetWeights::U16(ref i) => i.size_hint(),
+            MorphTargetWeights::F32(ref i) => i.size_hint(),
         }
     }
 }
